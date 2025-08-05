@@ -69,9 +69,18 @@ if response.code == "200"
   logger.info("Successfully retrieved data from API")
   json = JSON.parse(response.body)
 
-  # Display some result data
-  json['advertisements'].each do |item|
-    logger.info("#{item['applicationReference']} - #{item['address']} (#{item['advertisedDate']})")
+  # Debug structure
+  if json.is_a?(Hash) && json['advertisements']
+    json['advertisements'].each do |item|
+      logger.info("#{item['applicationReference']} - #{item['address']} (#{item['advertisedDate']})")
+    end
+  elsif json.is_a?(Array)
+    json.each do |item|
+      logger.info("#{item['applicationReference']} - #{item['address']} (#{item['advertisedDate']})")
+    end
+  else
+    logger.warn("Unexpected JSON structure:")
+    logger.warn(json.inspect)
   end
 else
   logger.error("API call failed with status #{response.code}")
