@@ -124,5 +124,3 @@ else
     logger.error("API call failed with status #{response.code}")
     logger.debug("Response body: #{response.body}")
 end
-logger.debug("Response body: #{response.body}")
-end
