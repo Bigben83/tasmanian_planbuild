@@ -74,8 +74,8 @@ post_uri = URI("https://portal.planbuild.tas.gov.au/external/advertisement/searc
 http = Net::HTTP.new(post_uri.host, post_uri.port)
 http.use_ssl = true
 
-post_data = { "lgaCode" => "LGA003" }
-lga_codes = (1..29).map { |i| "LGA%03d" % i }
+# post_data = { "lgaCode" => "LGA003" }
+lga_code = (1..29).map { |i| "LGA%03d" % i }
 
 lga_codes.each do |lga_code|
     logger.info("Fetching data for LGA: #{lga_code}")
