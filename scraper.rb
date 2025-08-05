@@ -88,7 +88,8 @@ lga_codes = [
 lga_codes.each do |lga_code|
     logger.info("Fetching data for LGA: #{lga_code}")
 
-    post_data = { "lgaCode" => lga_code }  # <-- update here per iteration
+    post_data = { "lgas" => [lga_code] }
+    logger.info("LGA: #{lga_code} | First result: #{json.first['addressString'] rescue 'N/A'}")
 
     post_request = Net::HTTP::Post.new(post_uri)
     post_request.body = post_data.to_json
