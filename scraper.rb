@@ -137,44 +137,45 @@ lga_codes.each do |lga_code|
 
             logger.info("Saved: #{council_reference} - #{description}")
 
-            # GET PDF AND DATA FROM UUID PAGE
+            # === Step 6: Fetch attachment data and download PDFs ===
+            begin
+                ad_uri = URI("https://portal.planbuild.tas.gov.au/external/advertisement/#{uuid}/get")
+                ad_request = Net::HTTP::Get.new(ad_uri)
+                ad_request['Cookie'] = session_cookie
+                ad_request['User-Agent'] = 'Mozilla/5.0'
 
-            # STEP 6: Fetch detail page using UUID
-            detail_uri = URI("https://portal.planbuild.tas.gov.au/external/advertisement/#{uuid}")
-            detail_http = Net::HTTP.new(detail_uri.host, detail_uri.port)
-            detail_http.use_ssl = true
+                ad_response = http.request(ad_request)
 
-            detail_request = Net::HTTP::Get.new(detail_uri)
-            detail_request['User-Agent'] = 'Mozilla/5.0'
+                if ad_response.code == "200"
+                    ad_data = JSON.parse(ad_response.body)
+                    attachments = ad_data['attachments'] || []
 
-            detail_response = detail_http.request(detail_request)
+                    attachments.each do |att|
+                        attachment_id = att['id']
+                        filename = att['name'].gsub(/[^0-9A-Za-z.\-]/, '_')  # Sanitize filename
 
-            if detail_response.code == '200'
-                detail_doc = Nokogiri::HTML(detail_response.body)
+                        file_uri = URI("https://portal.planbuild.tas.gov.au/external/advertisement/#{uuid}/attachment/#{attachment_id}")
+                        file_request = Net::HTTP::Get.new(file_uri)
+                        file_request['Cookie'] = session_cookie
+                        file_request['User-Agent'] = 'Mozilla/5.0'
 
-                # Look for PDF link with extension
-                pdf_link = detail_doc.css('a').find { |a| a.text.include?('.pdf') }
+                        logger.info("Downloading PDF: #{filename}")
+                        file_response = http.request(file_request)
 
-                if pdf_link
-                    pdf_url = URI.join("https://portal.planbuild.tas.gov.au", pdf_link['href']).to_s
-                    logger.info("PDF found: #{pdf_url}")
-
-                    # Optional: download the PDF
-                    pdf_response = Net::HTTP.get_response(URI(pdf_url))
-                    if pdf_response.code == '200'
-                        filename = "pdfs/#{council_reference.gsub(/[^\w\-]/, '_')}.pdf"
-                        Dir.mkdir("pdfs") unless Dir.exist?("pdfs")
-                        File.open(filename, 'wb') { |f| f.write(pdf_response.body) }
-                        logger.info("Saved PDF to #{filename}")
-                    else
-                        logger.warn("Failed to download PDF for #{council_reference}")
+                        if file_response.code == "200"
+                            File.open("pdfs/#{filename}", "wb") { |f| f.write(file_response.body) }
+                            logger.info("Saved PDF: pdfs/#{filename}")
+                        else
+                            logger.warn("Failed to download PDF for #{council_reference} (#{filename})")
+                        end
                     end
                 else
-                    logger.warn("No PDF found for #{council_reference}")
+                    logger.warn("No attachment JSON for #{council_reference}")
                 end
-            else
-                logger.error("Failed to load detail page for UUID #{uuid}")
+            rescue => e
+                logger.error("Error retrieving attachments for #{council_reference}: #{e.message}")
             end
+
 
         end
     else
