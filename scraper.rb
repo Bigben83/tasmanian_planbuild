@@ -75,52 +75,57 @@ http = Net::HTTP.new(post_uri.host, post_uri.port)
 http.use_ssl = true
 
 post_data = { "lgaCode" => "LGA003" }
+lga_codes = (1..29).map { |i| "LGA%03d" % i }
 
-post_request = Net::HTTP::Post.new(post_uri)
-post_request.body = post_data.to_json
-post_request['Content-Type'] = 'application/json'
-post_request['Origin'] = 'https://portal.planbuild.tas.gov.au'
-post_request['Referer'] = 'https://portal.planbuild.tas.gov.au/external/advertisement/search'
-post_request[csrf_header] = csrf_token
-post_request['X-Requested-With'] = 'XMLHttpRequest'
-post_request['Cookie'] = session_cookie
-post_request['User-Agent'] = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36'
+lga_codes.each do |lga_code|
+    logger.info("Fetching data for LGA: #{lga_code}")
 
-logger.info("Performing POST request to fetch data...")
-response = http.request(post_request)
+    post_request = Net::HTTP::Post.new(post_uri)
+    post_request.body = post_data.to_json
+    post_request['Content-Type'] = 'application/json'
+    post_request['Origin'] = 'https://portal.planbuild.tas.gov.au'
+    post_request['Referer'] = 'https://portal.planbuild.tas.gov.au/external/advertisement/search'
+    post_request[csrf_header] = csrf_token
+    post_request['X-Requested-With'] = 'XMLHttpRequest'
+    post_request['Cookie'] = session_cookie
+    post_request['User-Agent'] = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36'
 
-# STEP 5: Handle the JSON response
-if response.code == "200"
-    logger.info("Successfully retrieved data from API")
-    json = JSON.parse(response.body)
+    logger.info("Performing POST request to fetch data...")
+    response = http.request(post_request)
 
-    date_scraped = Time.now.utc.strftime("%Y-%m-%d %H:%M:%S")
+    # STEP 5: Handle the JSON response
+    if response.code == "200"
+        logger.info("Successfully retrieved data from API")
+        json = JSON.parse(response.body)
 
-    json.each do |item|
-        # Convert startDate from milliseconds to YYYY-MM-DD, use as date_received
-        date_received = (Time.at(item['startDate'] / 1000).utc.strftime("%Y-%m-%d") rescue nil)
-        on_notice_to = (Time.at(item['endDate'] / 1000).utc.strftime("%Y-%m-%d") rescue nil)
+        date_scraped = Time.now.utc.strftime("%Y-%m-%d %H:%M:%S")
 
-        # Prepare values for DB insert (use empty string or nil where not available)
-        description = item['description'] || ''
-        address = item['addressString'] || ''
-        council_reference = item['referenceNumber'] || ''
-        pid_reference = item['pid'] || ''
+        json.each do |item|
+            # Convert startDate from milliseconds to YYYY-MM-DD, use as date_received
+            date_received = (Time.at(item['startDate'] / 1000).utc.strftime("%Y-%m-%d") rescue nil)
+            on_notice_to = (Time.at(item['endDate'] / 1000).utc.strftime("%Y-%m-%d") rescue nil)
 
-        # Fields missing in API data, set to nil or empty string
-        applicant = ''
-        owner = ''
-        stage_description = ''
-        stage_status = ''
-        document_description = ''
-        title_reference = ''
+            # Prepare values for DB insert (use empty string or nil where not available)
+            description = item['description'] || ''
+            address = item['addressString'] || ''
+            council_reference = item['referenceNumber'] || ''
+            pid_reference = item['pid'] || ''
 
-        db.execute("INSERT INTO planbuild (description, date_scraped, date_received, on_notice_to, address, council_reference, applicant, owner, pid_reference, title_reference, stage_description, stage_status, document_description) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            [description, date_scraped, date_received, on_notice_to, address, council_reference, applicant, owner, pid_reference, title_reference, stage_description, stage_status, document_description])
+            # Fields missing in API data, set to nil or empty string
+            applicant = ''
+            owner = ''
+            stage_description = ''
+            stage_status = ''
+            document_description = ''
+            title_reference = ''
 
-        logger.info("Saved: #{council_reference} - #{description}")
+            db.execute("INSERT INTO planbuild (description, date_scraped, date_received, on_notice_to, address, council_reference, applicant, owner, pid_reference, title_reference, stage_description, stage_status, document_description) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                [description, date_scraped, date_received, on_notice_to, address, council_reference, applicant, owner, pid_reference, title_reference, stage_description, stage_status, document_description])
+
+            logger.info("Saved: #{council_reference} - #{description}")
+        end
+    else
+        logger.error("API call failed with status #{response.code}")
+        logger.debug("Response body: #{response.body}")
     end
-else
-    logger.error("API call failed with status #{response.code}")
-    logger.debug("Response body: #{response.body}")
 end
