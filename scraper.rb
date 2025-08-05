@@ -132,12 +132,18 @@ lga_codes.each do |lga_code|
             document_description = ''
             title_reference = ''
 
-            db.execute("INSERT INTO planbuild (description, date_scraped, date_received, on_notice_to, address, council_reference, applicant, owner, pid_reference, title_reference, stage_description, stage_status, document_description, uuid) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                [description, date_scraped, date_received, on_notice_to, address, council_reference, applicant, owner, pid_reference, title_reference, stage_description, stage_status, document_description, uuid])
+            # Step 6: Ensure the entry does not already exist before inserting
+            existing_entry = db.execute("SELECT * FROM planbuild WHERE council_reference = ?", council_reference )
 
-            logger.info("Saved: #{council_reference} - #{description}")
+            if existing_entry.empty? # Only insert if the entry doesn't already exist
+                db.execute("INSERT INTO planbuild (description, date_scraped, date_received, on_notice_to, address, council_reference, applicant, owner, pid_reference, title_reference, stage_description, stage_status, document_description, uuid) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    [description, date_scraped, date_received, on_notice_to, address, council_reference, applicant, owner, pid_reference, title_reference, stage_description, stage_status, document_description, uuid])
+                logger.info("Saved: #{council_reference} - #{description}")
+            else
+              logger.info("Duplicate entry for application #{council_reference} found. Skipping insertion.")
+            end
 
-            # === Step 6: Fetch attachment data and download PDFs ===
+            # === Step 5a: Fetch attachment data and download PDFs ===
             begin
                 ad_uri = URI("https://portal.planbuild.tas.gov.au/external/advertisement/#{uuid}/get")
                 ad_request = Net::HTTP::Get.new(ad_uri)
