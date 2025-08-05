@@ -27,7 +27,8 @@ stage_description TEXT,
 stage_status TEXT,
 document_description TEXT,
 title_reference TEXT,
-pid_reference TEXT
+pid_reference TEXT,
+uuid TEXT
 );
 SQL
 
@@ -121,6 +122,7 @@ lga_codes.each do |lga_code|
             address = item['addressString'] || ''
             council_reference = item['referenceNumber'] || ''
             pid_reference = item['pid'] || ''
+            uuid = item['uuid'] || ''
 
             # Fields missing in API data, set to nil or empty string
             applicant = ''
@@ -130,8 +132,8 @@ lga_codes.each do |lga_code|
             document_description = ''
             title_reference = ''
 
-            db.execute("INSERT INTO planbuild (description, date_scraped, date_received, on_notice_to, address, council_reference, applicant, owner, pid_reference, title_reference, stage_description, stage_status, document_description) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                [description, date_scraped, date_received, on_notice_to, address, council_reference, applicant, owner, pid_reference, title_reference, stage_description, stage_status, document_description])
+            db.execute("INSERT INTO planbuild (description, date_scraped, date_received, on_notice_to, address, council_reference, applicant, owner, pid_reference, title_reference, stage_description, stage_status, document_description, uuid) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                [description, date_scraped, date_received, on_notice_to, address, council_reference, applicant, owner, pid_reference, title_reference, stage_description, stage_status, document_description, uuid])
 
             logger.info("Saved: #{council_reference} - #{description}")
         end
