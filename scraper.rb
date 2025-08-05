@@ -1,25 +1,61 @@
-# This is a template for a Ruby scraper on morph.io (https://morph.io)
-# including some code snippets below that you should find helpful
+require 'net/http'
+require 'json'
+require 'sqlite3'
+require 'logger'
+require 'uri'
 
-# require 'scraperwiki'
-# require 'mechanize'
-#
-# agent = Mechanize.new
-#
-# # Read in a page
-# page = agent.get("http://foo.com")
-#
-# # Find something on the page using css selectors
-# p page.at('div.content')
-#
-# # Write out to the sqlite database using scraperwiki library
-# ScraperWiki.save_sqlite(["name"], {"name" => "susan", "occupation" => "software developer"})
-#
-# # An arbitrary query against the database
-# ScraperWiki.select("* from data where 'name'='peter'")
+logger = Logger.new(STDOUT)
+db = SQLite3::Database.new "data.sqlite"
 
-# You don't have to do things with the Mechanize or ScraperWiki libraries.
-# You can use whatever gems you want: https://morph.io/documentation/ruby
-# All that matters is that your final data is written to an SQLite database
-# called "data.sqlite" in the current working directory which has at least a table
-# called "data".
+# Create table if not exists
+db.execute <<-SQL
+  CREATE TABLE IF NOT EXISTS advertisement_data (
+    id INTEGER PRIMARY KEY,
+    address TEXT,
+    council_reference TEXT,
+    advertised_date TEXT
+  );
+SQL
+
+# Define the API endpoint and payload
+uri = URI('https://portal.planbuild.tas.gov.au/api/advertisement/search')
+headers = {
+  'Content-Type' => 'application/json'
+}
+
+# Example LGA code (you'll want to loop through others)
+lga_code = 'LGA003'  # Replace with actual code for a council
+
+payload = {
+  advertisementType: 'ALL',
+  lgaCode: lga_code,
+  offset: 0,
+  pageSize: 100,
+  sortField: 'advertisedDate',
+  sortDirection: 'DESC'
+}
+
+# Make the request
+http = Net::HTTP.new(uri.host, uri.port)
+http.use_ssl = true
+request = Net::HTTP::Post.new(uri.request_uri, headers)
+request.body = payload.to_json
+
+logger.info("Sending request to API for LGA code: #{lga_code}")
+response = http.request(request)
+
+if response.code.to_i == 200
+  results = JSON.parse(response.body)
+  results['data'].each do |item|
+    address = item['address']
+    reference = item['applicationReference']
+    date = item['advertisedDate']
+
+    logger.info("Saving: #{address} | #{reference} | #{date}")
+
+    db.execute("INSERT INTO advertisement_data (address, council_reference, advertised_date)
+                VALUES (?, ?, ?)", [address, reference, date])
+  end
+else
+  logger.error("API call failed with status #{response.code}")
+end
