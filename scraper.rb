@@ -1,57 +1,66 @@
-require 'mechanize'
-require 'sqlite3'
+require 'net/http'
+require 'uri'
 require 'json'
 require 'logger'
 
 logger = Logger.new(STDOUT)
-db = SQLite3::Database.new "data.sqlite"
 
-# Create table if not exists
-db.execute <<-SQL
-  CREATE TABLE IF NOT EXISTS advertisement_data (
-    id INTEGER PRIMARY KEY,
-    address TEXT,
-    council_reference TEXT,
-    advertised_date TEXT
-  );
-SQL
+# First: Fetch the HTML page to get CSRF token and cookies
+uri = URI("https://portal.planbuild.tas.gov.au/external/advertisement/search")
+http = Net::HTTP.new(uri.host, uri.port)
+http.use_ssl = true
 
-agent = Mechanize.new
-agent.user_agent_alias = 'Windows Chrome'
+# Initial GET to set session cookie and grab token
+logger.info("Performing initial GET request...")
+get_request = Net::HTTP::Get.new(uri)
+get_request['User-Agent'] = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36'
 
-# Visit the initial page to get cookies/session
-logger.info("Visiting initial page to get session")
-agent.get("https://portal.planbuild.tas.gov.au/external/advertisement/search")
+response = http.request(get_request)
 
-# Now post to the JSON API
-uri = 'https://portal.planbuild.tas.gov.au/api/advertisement/search'
-payload = {
-  advertisementType: 'ALL',
-  lgaCode: 'LGA003',
-  offset: 0,
-  pageSize: 100,
-  sortField: 'advertisedDate',
-  sortDirection: 'DESC'
+# Extract cookies
+set_cookie = response['Set-Cookie']
+session_cookie = set_cookie[/SESSION=[^;]+/]
+
+# Extract CSRF token from HTML meta tag
+csrf_token = response.body[/name="csrf-token" content="([^"]+)"/, 1]
+
+if csrf_token.nil? || session_cookie.nil?
+  logger.error("Failed to extract CSRF token or session cookie.")
+  exit
+end
+
+logger.info("Extracted CSRF Token: #{csrf_token}")
+logger.info("Extracted Session Cookie: #{session_cookie}")
+
+# Now: Perform POST request to the actual data endpoint
+post_uri = URI("https://portal.planbuild.tas.gov.au/external/advertisement/search/listadvertisements")
+http = Net::HTTP.new(post_uri.host, post_uri.port)
+http.use_ssl = true
+
+post_data = {
+  "lgaCode" => "LGA003"  # Replace this with the desired council
 }
 
-logger.info("Posting to API endpoint")
-response = agent.post(uri, payload.to_json, {
-  'Content-Type' => 'application/json',
-  'Accept' => 'application/json'
-})
+post_request = Net::HTTP::Post.new(post_uri)
+post_request.body = post_data.to_json
+post_request['Content-Type'] = 'application/json'
+post_request['Origin'] = 'https://portal.planbuild.tas.gov.au'
+post_request['Referer'] = 'https://portal.planbuild.tas.gov.au/external/advertisement/search'
+post_request['X-CSRF-TOKEN'] = csrf_token
+post_request['X-Requested-With'] = 'XMLHttpRequest'
+post_request['Cookie'] = session_cookie
+post_request['User-Agent'] = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36'
 
-if response.code == '200'
-  results = JSON.parse(response.body)
-  results['data'].each do |item|
-    address = item['address']
-    reference = item['applicationReference']
-    date = item['advertisedDate']
+logger.info("Performing POST request to fetch data...")
+response = http.request(post_request)
 
-    logger.info("Saving: #{address} | #{reference} | #{date}")
-    db.execute("INSERT INTO advertisement_data (address, council_reference, advertised_date)
-                VALUES (?, ?, ?)", [address, reference, date])
+if response.code == "200"
+  logger.info("Successfully retrieved data")
+  json = JSON.parse(response.body)
+  json['advertisements'].each do |item|
+    logger.info("#{item['applicationReference']} - #{item['address']} (#{item['advertisedDate']})")
   end
 else
-  logger.error("API call failed with status #{response.code}")
-  logger.debug("Body: #{response.body}")
+  logger.error("Failed with code #{response.code}")
+  logger.debug("Response body: #{response.body}")
 end
