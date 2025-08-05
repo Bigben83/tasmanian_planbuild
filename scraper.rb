@@ -75,10 +75,20 @@ http = Net::HTTP.new(post_uri.host, post_uri.port)
 http.use_ssl = true
 
 # post_data = { "lgaCode" => "LGA003" }
-lga_code = (1..29).map { |i| "LGA%03d" % i }
+# lga_codes = (1..29).map { |i| "LGA%03d" % i }
+lga_codes = [
+  "BREAK_ODAY", "BRIGHTON", "BURNIE", "CENTRAL_COAST", "CENTRAL_HIGHLANDS",
+  "CIRCULAR_HEAD", "CLARENCE", "DERWENT_VALLEY", "DEVONPORT", "DORSET",
+  "FLINDERS", "GEORGE_TOWN", "GLAMORGAN-SPRING_BAY", "GLENORCHY", "HOBART",
+  "HUON_VALLEY", "KENTISH", "KINGBOROUGH", "KING_ISLAND", "LATROBE",
+  "LAUNCESTON", "MEANDER_VALLEY", "NORTHERN_MIDLANDS", "SORELL",
+  "SOUTHERN_MIDLANDS", "TASMAN", "WARATAH-WYNYARD", "WEST_COAST", "WEST_TAMAR"
+]
 
 lga_codes.each do |lga_code|
     logger.info("Fetching data for LGA: #{lga_code}")
+
+    post_data = { "lgaCode" => lga_code }  # <-- update here per iteration
 
     post_request = Net::HTTP::Post.new(post_uri)
     post_request.body = post_data.to_json
