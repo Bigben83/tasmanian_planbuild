@@ -96,41 +96,33 @@ if response.code == "200"
 
     date_scraped = Time.now.utc.strftime("%Y-%m-%d %H:%M:%S")
 
-    # Debug structure
-    if json.is_a?(Hash) && json['advertisements']
-      json['advertisements'].each do |item|
-            # Convert startDate from milliseconds to YYYY-MM-DD, use as date_received
-            date_received = (Time.at(item['startDate'] / 1000).utc.strftime("%Y-%m-%d") rescue nil)
-            on_notice_to = (Time.at(item['endDate'] / 1000).utc.strftime("%Y-%m-%d") rescue nil)
+    json.each do |item|
+        # Convert startDate from milliseconds to YYYY-MM-DD, use as date_received
+        date_received = (Time.at(item['startDate'] / 1000).utc.strftime("%Y-%m-%d") rescue nil)
+        on_notice_to = (Time.at(item['endDate'] / 1000).utc.strftime("%Y-%m-%d") rescue nil)
 
-            # Prepare values for DB insert (use empty string or nil where not available)
-            description = item['description'] || ''
-            address = item['addressString'] || ''
-            council_reference = item['referenceNumber'] || ''
-            pid_reference = item['pid'] || ''
+        # Prepare values for DB insert (use empty string or nil where not available)
+        description = item['description'] || ''
+        address = item['addressString'] || ''
+        council_reference = item['referenceNumber'] || ''
+        pid_reference = item['pid'] || ''
 
-            # Fields missing in API data, set to nil or empty string
-            applicant = ''
-            owner = ''
-            stage_description = ''
-            stage_status = ''
-            document_description = ''
-            title_reference = ''
+        # Fields missing in API data, set to nil or empty string
+        applicant = ''
+        owner = ''
+        stage_description = ''
+        stage_status = ''
+        document_description = ''
+        title_reference = ''
 
-            db.execute("INSERT INTO planbuild (description, date_scraped, date_received, on_notice_to, address, council_reference, applicant, owner, pid_reference, title_reference, stage_description, stage_status, document_description) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                [description, date_scraped, date_received, on_notice_to, address, council_reference, applicant, owner, pid_reference, title_reference, stage_description, stage_status, document_description])
+        db.execute("INSERT INTO planbuild (description, date_scraped, date_received, on_notice_to, address, council_reference, applicant, owner, pid_reference, title_reference, stage_description, stage_status, document_description) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            [description, date_scraped, date_received, on_notice_to, address, council_reference, applicant, owner, pid_reference, title_reference, stage_description, stage_status, document_description])
 
-            logger.info("Saved: #{council_reference} - #{description}")
-        end
-    elsif json.is_a?(Array)
-        json.each do |item|
-            logger.info("Item JSON: #{item.inspect}")
-        end
-    else
-        logger.warn("Unexpected JSON structure:")
-        logger.warn(json.inspect)
+        logger.info("Saved: #{council_reference} - #{description}")
     end
 else
     logger.error("API call failed with status #{response.code}")
     logger.debug("Response body: #{response.body}")
+end
+logger.debug("Response body: #{response.body}")
 end
