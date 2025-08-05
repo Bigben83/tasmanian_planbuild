@@ -20,7 +20,11 @@ SQL
 # Define the API endpoint and payload
 uri = URI('https://portal.planbuild.tas.gov.au/api/advertisement/search')
 headers = {
-  'Content-Type' => 'application/json'
+  'Content-Type' => 'application/json',
+  'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36',
+  'Origin' => 'https://portal.planbuild.tas.gov.au',
+  'Referer' => 'https://portal.planbuild.tas.gov.au/external/advertisement/search',
+  'Accept' => 'application/json, text/plain, */*'
 }
 
 # Example LGA code (you'll want to loop through others)
@@ -43,6 +47,9 @@ request.body = payload.to_json
 
 logger.info("Sending request to API for LGA code: #{lga_code}")
 response = http.request(request)
+
+logger.info("Response code: #{response.code}")
+logger.debug("Response body: #{response.body}")
 
 if response.code.to_i == 200
   results = JSON.parse(response.body)
