@@ -71,17 +71,17 @@ if response.code == "200"
 
   # Debug structure
   if json.is_a?(Hash) && json['advertisements']
-    json['advertisements'].each do |item|
-      logger.info("#{item['applicationReference']} - #{item['address']} (#{item['advertisedDate']})")
-    end
-  elsif json.is_a?(Array)
-    json.each do |item|
-      logger.info("#{item['applicationReference']} - #{item['address']} (#{item['advertisedDate']})")
-    end
-  else
-    logger.warn("Unexpected JSON structure:")
-    logger.warn(json.inspect)
+  json['advertisements'].each do |item|
+    logger.info("Item JSON: #{item.inspect}")
   end
+elsif json.is_a?(Array)
+  json.each do |item|
+    logger.info("Item JSON: #{item.inspect}")
+  end
+else
+  logger.warn("Unexpected JSON structure:")
+  logger.warn(json.inspect)
+end
 else
   logger.error("API call failed with status #{response.code}")
   logger.debug("Response body: #{response.body}")
