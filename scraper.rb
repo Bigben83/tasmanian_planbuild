@@ -78,13 +78,13 @@ http.use_ssl = true
 # post_data = { "lgaCode" => "LGA003" }
 # lga_codes = (1..29).map { |i| "LGA%03d" % i }
 lga_codes = [
-  "BREAK_ODAY", "BRIGHTON", "BURNIE", "CENTRAL_COAST", "CENTRAL_HIGHLANDS",
-  "CIRCULAR_HEAD", "CLARENCE", "DERWENT_VALLEY", "DEVONPORT", "DORSET",
-  "FLINDERS", "GEORGE_TOWN", "GLAMORGAN-SPRING_BAY", "GLENORCHY", "HOBART",
-  "HUON_VALLEY", "KENTISH", "KINGBOROUGH", "KING_ISLAND", "LATROBE",
-  "LAUNCESTON", "MEANDER_VALLEY", "NORTHERN_MIDLANDS", "SORELL",
-  "SOUTHERN_MIDLANDS", "TASMAN", "WARATAH-WYNYARD", "WEST_COAST", "WEST_TAMAR"
-]
+    "BREAK_ODAY", "BRIGHTON", "BURNIE", "CENTRAL_COAST", "CENTRAL_HIGHLANDS",
+    "CIRCULAR_HEAD", "CLARENCE", "DERWENT_VALLEY", "DEVONPORT", "DORSET",
+    "FLINDERS", "GEORGE_TOWN", "GLAMORGAN-SPRING_BAY", "GLENORCHY", "HOBART",
+    "HUON_VALLEY", "KENTISH", "KINGBOROUGH", "KING_ISLAND", "LATROBE",
+    "LAUNCESTON", "MEANDER_VALLEY", "NORTHERN_MIDLANDS", "SORELL",
+    "SOUTHERN_MIDLANDS", "TASMAN", "WARATAH-WYNYARD", "WEST_COAST", "WEST_TAMAR"
+    ]
 
 lga_codes.each do |lga_code|
     logger.info("Fetching data for LGA: #{lga_code}")
@@ -136,6 +136,46 @@ lga_codes.each do |lga_code|
                 [description, date_scraped, date_received, on_notice_to, address, council_reference, applicant, owner, pid_reference, title_reference, stage_description, stage_status, document_description, uuid])
 
             logger.info("Saved: #{council_reference} - #{description}")
+
+            # GET PDF AND DATA FROM UUID PAGE
+
+            # STEP 6: Fetch detail page using UUID
+            detail_uri = URI("https://portal.planbuild.tas.gov.au/external/advertisement/#{uuid}")
+            detail_http = Net::HTTP.new(detail_uri.host, detail_uri.port)
+            detail_http.use_ssl = true
+
+            detail_request = Net::HTTP::Get.new(detail_uri)
+            detail_request['User-Agent'] = 'Mozilla/5.0'
+
+            detail_response = detail_http.request(detail_request)
+
+            if detail_response.code == '200'
+                detail_doc = Nokogiri::HTML(detail_response.body)
+
+                # Look for PDF link with extension
+                pdf_link = detail_doc.css('a').find { |a| a.text.include?('.pdf') }
+
+                if pdf_link
+                    pdf_url = URI.join("https://portal.planbuild.tas.gov.au", pdf_link['href']).to_s
+                    logger.info("PDF found: #{pdf_url}")
+
+                    # Optional: download the PDF
+                    pdf_response = Net::HTTP.get_response(URI(pdf_url))
+                    if pdf_response.code == '200'
+                        filename = "pdfs/#{council_reference.gsub(/[^\w\-]/, '_')}.pdf"
+                        Dir.mkdir("pdfs") unless Dir.exist?("pdfs")
+                        File.open(filename, 'wb') { |f| f.write(pdf_response.body) }
+                        logger.info("Saved PDF to #{filename}")
+                    else
+                        logger.warn("Failed to download PDF for #{council_reference}")
+                    end
+                else
+                    logger.warn("No PDF found for #{council_reference}")
+                end
+            else
+                logger.error("Failed to load detail page for UUID #{uuid}")
+            end
+
         end
     else
         logger.error("API call failed with status #{response.code}")
