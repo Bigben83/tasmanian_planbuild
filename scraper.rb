@@ -18,13 +18,22 @@ get_request['User-Agent'] = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebK
 response = http.request(get_request)
 
 # STEP 2: Extract session cookie
-set_cookie_header = response.get_fields('Set-Cookie')
-session_cookie = set_cookie_header&.find { |c| c.start_with?('SESSION=') }
+set_cookie_header = response.get_fields('Set-Cookie') || []
+session_cookie = nil
+set_cookie_header.each do |cookie|
+  if cookie.start_with?("SESSION=")
+    session_cookie = cookie.split(';').first
+    break
+  end
+end
 
 # STEP 3: Extract CSRF token and header name
 doc = Nokogiri::HTML(response.body)
-csrf_token = doc.at('meta[name="_csrf"]')&.[]('content')
-csrf_header = doc.at('meta[name="_csrf_header"]')&.[]('content') || 'X-CSRF-TOKEN'
+csrf_token_tag = doc.at('meta[name="_csrf"]')
+csrf_header_tag = doc.at('meta[name="_csrf_header"]')
+
+csrf_token = csrf_token_tag ? csrf_token_tag['content'] : nil
+csrf_header = csrf_header_tag ? csrf_header_tag['content'] : 'X-CSRF-TOKEN'
 
 if csrf_token.nil? || session_cookie.nil?
   logger.error("Failed to extract CSRF token or session cookie.")
@@ -40,7 +49,6 @@ post_uri = URI("https://portal.planbuild.tas.gov.au/external/advertisement/searc
 http = Net::HTTP.new(post_uri.host, post_uri.port)
 http.use_ssl = true
 
-# You can change this LGA code to others later
 post_data = { "lgaCode" => "LGA003" }
 
 post_request = Net::HTTP::Post.new(post_uri)
