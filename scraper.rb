@@ -152,7 +152,12 @@ lga_codes.each do |lga_code|
 
                     attachments.each do |att|
                         attachment_id = att['id']
-                        filename = att['name'].gsub(/[^0-9A-Za-z.\-]/, '_')  # Sanitize filename
+                        if filename.nil? || filename.strip.empty?
+                            logger.warn("Attachment name missing for #{council_reference}, attachment ID #{attachment_id}")
+                            filename = "unknown_#{attachment_id}.pdf"
+                        end
+
+                        filename = filename.gsub(/[^0-9A-Za-z.\-]/, '_')  # Sanitize filename
 
                         file_uri = URI("https://portal.planbuild.tas.gov.au/external/advertisement/#{uuid}/attachment/#{attachment_id}")
                         file_request = Net::HTTP::Get.new(file_uri)
