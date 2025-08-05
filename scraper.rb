@@ -98,7 +98,7 @@ if response.code == "200"
 
     # Debug structure
     if json.is_a?(Hash) && json['advertisements']
-        json.each do |item|
+      json['advertisements'].each do |item|
             # Convert startDate from milliseconds to YYYY-MM-DD, use as date_received
             date_received = (Time.at(item['startDate'] / 1000).utc.strftime("%Y-%m-%d") rescue nil)
             on_notice_to = (Time.at(item['endDate'] / 1000).utc.strftime("%Y-%m-%d") rescue nil)
@@ -117,7 +117,7 @@ if response.code == "200"
             document_description = ''
             title_reference = ''
 
-            db.execute("INSERT INTO planbuild (description, date_scraped, date_received, on_notice_to, address, council_reference, applicant, owner, pid_reference, title_reference, stage_description, stage_status, document_description) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            db.execute("INSERT INTO planbuild (description, date_scraped, date_received, on_notice_to, address, council_reference, applicant, owner, pid_reference, title_reference, stage_description, stage_status, document_description) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 [description, date_scraped, date_received, on_notice_to, address, council_reference, applicant, owner, pid_reference, title_reference, stage_description, stage_status, document_description])
 
             logger.info("Saved: #{council_reference} - #{description}")
