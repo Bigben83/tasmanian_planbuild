@@ -169,19 +169,17 @@ lga_codes.each do |lga_code|
 
                         logger.info("Downloading PDF: #{filename}")
                         file_response = http.request(file_request)
-                        #
-                        #if file_response.code == "200"
-                        #    File.open("pdfs/#{filename}", "wb") { |f| f.write(file_response.body) }
-                        #    logger.info("Saved PDF: pdfs/#{filename}")
-                        #else
-                        #    logger.warn("Failed to download PDF for #{council_reference} (#{filename})")
-                        #end
+                        
+                        if file_response.code == "200"
+                            File.open("pdfs/#{filename}", "wb") { |f| f.write(file_response.body) }
+                            logger.info("Saved PDF: pdfs/#{filename}")
+                        else
+                            logger.warn("Failed to download PDF for #{council_reference} (#{filename})")
+                        end
                         if file_response.code == "200"
                             pdf_blob = file_response.body # binary data of PDF
-
                             # Save PDF as blob in the database for this council_reference (or uuid)
-                            db.execute("UPDATE planbuild SET pdf_data = ? WHERE uuid = ?", [SQLite3::Blob.new(pdf_blob), uuid])
-
+                            # db.execute("UPDATE planbuild SET pdf_data = ? WHERE uuid = ?", [SQLite3::Blob.new(pdf_blob), uuid])
                             logger.info("Saved PDF blob to DB for #{council_reference}")
                         else
                             logger.warn("Failed to download PDF for #{council_reference} (#{filename})")
