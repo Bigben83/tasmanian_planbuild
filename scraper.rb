@@ -5,6 +5,7 @@ require 'logger'
 require 'nokogiri'
 require 'sqlite3'
 require 'time'
+require 'net/http/post/multipart'
 
 logger = Logger.new(STDOUT)
 
