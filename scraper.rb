@@ -172,37 +172,45 @@ lga_codes.each do |lga_code|
                         file_response = http.request(file_request)
 
                         if file_response.code == "200"
-                            # Stream PDF directly to PHP endpoint
-                            upload_uri = URI("https://yourserver.com/upload-pdf.php")
+                            pdf_data = file_response.body
 
-                            temp_file = Tempfile.new(['upload', '.pdf'])
-                            temp_file.binmode
-                            temp_file.write(file_response.body)
-                            temp_file.rewind
+                            # Build multipart POST manually
+                            boundary = "----RubyBoundary#{rand(1000000)}"
+                            post_uri = URI("https://yourserver.com/upload-pdf.php")
 
-                            req = Net::HTTP::Post::Multipart.new upload_uri.path,
-                            "pdf" => UploadIO.new(temp_file, "application/pdf", filename),
-                            "token" => "MY_SECRET_TOKEN",
-                            "uuid" => uuid,
-                            "council_reference" => council_reference
+                            multipart_body = []
+                            multipart_body << "--#{boundary}\r\n"
+                            multipart_body << "Content-Disposition: form-data; name=\"pdf\"; filename=\"#{filename}\"\r\n"
+                            multipart_body << "Content-Type: application/pdf\r\n\r\n"
+                            multipart_body << pdf_data
+                            multipart_body << "\r\n--#{boundary}\r\n"
 
-                            upload_http = Net::HTTP.new(upload_uri.host, upload_uri.port)
-                            upload_http.use_ssl = (upload_uri.scheme == "https")
+                            multipart_body << "Content-Disposition: form-data; name=\"uuid\"\r\n\r\n"
+                            multipart_body << "#{uuid}\r\n--#{boundary}\r\n"
 
-                            upload_response = upload_http.request(req)
+                            multipart_body << "Content-Disposition: form-data; name=\"council_reference\"\r\n\r\n"
+                            multipart_body << "#{council_reference}\r\n--#{boundary}\r\n"
 
-                            if upload_response.code == "200"
-                                logger.info("Uploaded #{filename} to server")
+                            multipart_body << "Content-Disposition: form-data; name=\"token\"\r\n\r\n"
+                            multipart_body << "MY_SECRET_TOKEN\r\n--#{boundary}--\r\n"
+
+                            request = Net::HTTP::Post.new(post_uri)
+                            request["Content-Type"] = "multipart/form-data; boundary=#{boundary}"
+                            request.body = multipart_body.join
+
+                            upload_http = Net::HTTP.new(post_uri.host, post_uri.port)
+                            upload_http.use_ssl = (post_uri.scheme == "https")
+
+                            response = upload_http.request(request)
+
+                            if response.code == "200"
+                                logger.info("✅ Uploaded #{filename} to server")
                             else
-                                logger.error("Failed to upload #{filename}: #{upload_response.body}")
+                                logger.error("❌ Upload failed for #{filename}: #{response.body}")
                             end
-
-                            temp_file.close
-                            temp_file.unlink
                         else
-                            logger.warn("Failed to download PDF for #{council_reference} (#{filename})")
+                            logger.warn("❌ Failed to download PDF for #{council_reference} (#{filename})")
                         end
-
                     end
                 else
                     logger.warn("No attachment JSON for #{council_reference}")
@@ -210,8 +218,6 @@ lga_codes.each do |lga_code|
             rescue => e
                 logger.error("Error retrieving attachments for #{council_reference}: #{e.message}")
             end
-
-
         end
     else
         logger.error("API call failed with status #{response.code}")
