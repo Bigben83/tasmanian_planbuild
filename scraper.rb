@@ -175,7 +175,7 @@ lga_codes.each do |lga_code|
 
                             # Build multipart POST manually
                             boundary = "----RubyBoundary#{rand(1000000)}"
-                            post_uri = URI("https://yourserver.com/upload-pdf.php")
+                            post_uri = URI("https://modulosdesign.com.au/internal/planbuild.php")
 
                             multipart_body = []
                             multipart_body << "--#{boundary}\r\n"
