@@ -5,6 +5,7 @@ require 'logger'
 require 'nokogiri'
 require 'sqlite3'
 require 'time'
+require 'net/http/post/multipart'
 
 logger = Logger.new(STDOUT)
 
@@ -169,22 +170,39 @@ lga_codes.each do |lga_code|
 
                         logger.info("Downloading PDF: #{filename}")
                         file_response = http.request(file_request)
-                        
+
                         if file_response.code == "200"
-                            File.open("pdfs/#{filename}", "wb") { |f| f.write(file_response.body) }
-                            logger.info("Saved PDF: pdfs/#{filename}")
+                            # Stream PDF directly to PHP endpoint
+                            upload_uri = URI("https://yourserver.com/upload-pdf.php")
+
+                            temp_file = Tempfile.new(['upload', '.pdf'])
+                            temp_file.binmode
+                            temp_file.write(file_response.body)
+                            temp_file.rewind
+
+                            req = Net::HTTP::Post::Multipart.new upload_uri.path,
+                            "pdf" => UploadIO.new(temp_file, "application/pdf", filename),
+                            "token" => "MY_SECRET_TOKEN",
+                            "uuid" => uuid,
+                            "council_reference" => council_reference
+
+                            upload_http = Net::HTTP.new(upload_uri.host, upload_uri.port)
+                            upload_http.use_ssl = (upload_uri.scheme == "https")
+
+                            upload_response = upload_http.request(req)
+
+                            if upload_response.code == "200"
+                                logger.info("Uploaded #{filename} to server")
+                            else
+                                logger.error("Failed to upload #{filename}: #{upload_response.body}")
+                            end
+
+                            temp_file.close
+                            temp_file.unlink
                         else
                             logger.warn("Failed to download PDF for #{council_reference} (#{filename})")
                         end
-                        if file_response.code == "200"
-                            pdf_blob = file_response.body # binary data of PDF
-                            # Save PDF as blob in the database for this council_reference (or uuid)
-                            # db.execute("UPDATE planbuild SET pdf_data = ? WHERE uuid = ?", [SQLite3::Blob.new(pdf_blob), uuid])
-                            logger.info("Saved PDF blob to DB for #{council_reference}")
-                        else
-                            logger.warn("Failed to download PDF for #{council_reference} (#{filename})")
-                        end
-                        
+
                     end
                 else
                     logger.warn("No attachment JSON for #{council_reference}")
